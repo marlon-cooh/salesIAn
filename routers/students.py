@@ -1,11 +1,12 @@
-from models import Student, StudentCreate, StudentUpdate
+from models import Student, StudentCreate, StudentUpdate, StudentSubjectLink
 from sqlmodel import select
-from db_create import SessionDep
+from postgres_db_create import SessionDep
 from fastapi import APIRouter, HTTPException, status
 
 router = APIRouter()
 
-@router.post("/students/", response_model=Student)
+# Post student info
+@router.post("/students/", response_model=Student, tags=['student'])
 def create_student(student: StudentCreate, session: SessionDep):
     db_student = Student.model_validate(student.model_dump())
     session.add(db_student)
@@ -13,12 +14,28 @@ def create_student(student: StudentCreate, session: SessionDep):
     session.refresh(db_student)
     return db_student
 
-@router.get("/students/{student_id}", response_model=Student)
+# Get student info
+@router.get("/students/{student_id}", response_model=Student, tags=['student'])
 def read_student(student_id: int, session: SessionDep):
     student = session.get(Student, student_id)
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
     return student
+
+# # Establish relationship between student and subject
+# @router.post("/students/{student_id}/subjects/{subject_id}", response_model=Student)
+# def assign_subject_to_student(student_id: int, subject_id: int, session: SessionDep):
+#     student = session.get(Student, student_id)
+#     if not student:
+#         raise HTTPException(status_code=404, detail="Student not found")
+#     subject = session.get(Subject, subject_id)
+#     if not subject:
+#         raise HTTPException(status_code=404, detail="Subject not found")
+#     student.subjects.append(subject)
+#     session.add(student)
+#     session.commit()
+#     session.refresh(student)
+#     return student
 
 # @router.put("/students/{student_id}", response_model=Student)
 # def update_student(student_id: int, student_update: StudentUpdate, session: SessionDep):
@@ -33,7 +50,7 @@ def read_student(student_id: int, session: SessionDep):
 #     session.refresh(student)
 #     return student
 
-@router.delete("/students/{student_id}")
+@router.delete("/students/{student_id}", tags=['student'])
 def delete_student(student_id: int, session: SessionDep):
     student = session.get(Student, student_id)
     if not student:
@@ -45,7 +62,7 @@ def delete_student(student_id: int, session: SessionDep):
     session.commit()
     return {"ok": True}
 
-@router.get("/students/", response_model=list[Student])
+@router.get("/students/", response_model=list[Student], tags=['student'])
 def read_students(session: SessionDep):
     students = session.exec(select(Student)).all()
     return students 
