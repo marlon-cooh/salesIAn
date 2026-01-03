@@ -13,7 +13,17 @@ class StudentSubjectLink(SQLModel, table=True):
     __tablename__ = "student_to_subject"
     student_id : int = Field(foreign_key="student.id", primary_key=True)
     subject_id : int = Field(foreign_key="subject.id", primary_key=True)
+    term_id : int = Field(foreign_key="term.id", primary_key=True)
     grade : str
+    term : 'Term' = Relationship(back_populates='student_links') 
+    
+class Term(SQLModel, table=True):
+    __tablename__ = "term"
+    id : int | None = Field(default=None, primary_key=True)
+    code : str
+    label : str
+    order : int
+    student_links : list[StudentSubjectLink] = Relationship(back_populates='term')
     
 class StudentCreate(StudentBase):
     pass
