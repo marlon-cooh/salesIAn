@@ -38,6 +38,9 @@ class Student(StudentBase, table=True):
     
 class SubjectBase(SQLModel):
     component : str
+    
+class SubjectUpdate(StudentBase):
+    pass
 
 class Subject(SubjectBase, table=True):
     __tablename__ = "subject"

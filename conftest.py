@@ -5,7 +5,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel
 
 from app.main import test_app
-from db_create import get_session
+from app.db_create import get_session
 
 # Database for testing
 sqlite_name = "db.sqlite3"

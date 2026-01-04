@@ -1,5 +1,5 @@
 from fastapi import APIRouter, status, HTTPException
-from models import Subject, StudentSubjectLink
+from models import Subject, StudentSubjectLink, SubjectUpdate
 from postgres_db_create import SessionDep
 
 router = APIRouter()
@@ -19,6 +19,30 @@ async def get_subject(subject_id : int, session : SessionDep):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
     return subj_db
 
+@router.put("/subject/{subject_id}", tags=["subjects"], response_model=Subject)
+def update_subject(subject_id : int, subject_update : SubjectUpdate, session : SessionDep):
+    subject = session.get(Subject, subject_id)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found.")
+    subject.sqlmodel_update(subject_update.model_dump(exclude_unset=True))
+    session.add(subject)
+    session.commit()
+    session.refresh(subject)
+    return subject
+
+@router.delete("/subjects/{subject_id}", tags=["subjects"])
+def delete_subject(subject_id : int, session : SessionDep):
+    subject = session.get(Subject, subject_id)
+    if not subject:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subject not registered."
+        )
+    session.delete(subject)
+    session.commit()
+    return {"ok" : True}
+
+# StudentSubjectLink table    
 @router.post("/subjects/all", tags=["grades"])
 async def create_grade_register(subject_info : StudentSubjectLink, session : SessionDep):
     grade_db = StudentSubjectLink.model_validate(subject_info.model_dump())
