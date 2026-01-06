@@ -4,8 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 from fastapi import Depends, FastAPI
 from sqlmodel import Session, create_engine, SQLModel
-# from app.postgres_db_create import DATABASE_URL
-from dotenv import load_dotenv
+from typing import Annotated
 from urllib.parse import quote_plus
 
 def build_database_url() -> str:
@@ -37,8 +36,22 @@ def build_database_url() -> str:
         
     return db_url
 
-if __name__ == "__main__":
-    load_dotenv()
-    DATABASE_URL = build_database_url()
-    print("DATABASE_URL:", DATABASE_URL)
+DATABASE_URL = build_database_url()
+
+# SQLite needs check_same_thread set to False
+connect_args = {}
+if DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread" : False}
+
+engine = create_engine(DATABASE_URL, echo=True, connect_args=connect_args)
+
+@asynccontextmanager
+async def lifespan(app:FastAPI):
+    SQLModel.metadata.create_all(engine)
+    yield
     
+def get_session():
+    with Session(engine) as session:
+        yield session
+
+SessionDep = Annotated[Session, Depends(get_session)]

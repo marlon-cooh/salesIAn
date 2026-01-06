@@ -1,6 +1,6 @@
 from models import Student, StudentCreate, StudentUpdate, StudentSubjectLink
 from sqlmodel import select
-from postgres_db_create import SessionDep
+from app.dependencies import SessionDep
 from fastapi import APIRouter, HTTPException, status
 
 router = APIRouter()

@@ -170,12 +170,11 @@ def remove_unregistered_students(raw_df:pd.DataFrame) -> pd.DataFrame:
 
     return merged
 
-def clean_level_grades(df: pd.DataFrame, final_student: int, cols_to_present: list) -> pd.DataFrame:
+def clean_level_grades(df: pd.DataFrame, cols_to_present: list) -> pd.DataFrame:
     """Clean and format grade level data.
     
     Args:
         df: Input DataFrame containing grade information
-        final_student: Last student index to include
         cols_to_present: List of columns to keep in output
     
     Returns:
@@ -185,13 +184,13 @@ def clean_level_grades(df: pd.DataFrame, final_student: int, cols_to_present: li
         case_type='snake',
         strip_underscores=True,
         remove_special=True        
-    ).loc[:final_student, cols_to_present].reset_index().rename(columns={'index':'idx'})
+    ).loc[-10:, cols_to_present].reset_index().rename(columns={'index':'idx'})
     )
 
 def safe_drop(df:pd.DataFrame, colname:str) -> pd.DataFrame:
     return df.drop(columns=[colname], errors='ignore')
 
-def retrieve_grade_reports(inpath:str, cols_to_present=None, final_student=95, **kwargs) -> dict:
+def retrieve_grade_reports(inpath:str, cols_to_present=None, **kwargs) -> dict:
     """
         This function returns a complete, cleaned, and ready-to-eda dataframe from grade reports taken in .xls format from database.
         (Args):
@@ -238,7 +237,7 @@ def retrieve_grade_reports(inpath:str, cols_to_present=None, final_student=95, *
         else:
             raise ValueError("File name must contain grade level (9, 10, or 11)")
            
-        level_grades = clean_level_grades(df, final_student, cols_to_present)
+        level_grades = clean_level_grades(df, cols_to_present)
     
     except (KeyError) as ke:
         print(f"Column error: {ke}. Check if columns match grade level.")
@@ -250,14 +249,14 @@ def retrieve_grade_reports(inpath:str, cols_to_present=None, final_student=95, *
     )
     
     # To segment by period.
-    allowed_periods = {"P1", "P2", "P3"}
+    allowed_periods = {"P1", "P2", "P3", "PF"}
 
     for key, value in kwargs.items():
         if isinstance(value, str) and value in allowed_periods:
             level_grades[f'{key}'] = value.strip()
         else:
             raise ValueError(
-                "Additional parameters MUST be period indicators: 'P1', 'P2', or 'P3'."
+                "Additional parameters MUST be period indicators: 'P1', 'P2', 'P3', or 'PF'."
             )
                 
     # Creating dataframes for periods P1 and P2.
@@ -470,6 +469,9 @@ def df_to_model(input_dfs:list) -> pd.DataFrame:
         wrapped_df.select(
         'idx', 'codigo', 'nombre', 'period', 'esp', 'ingl', 'edufi', 'art', 'soc', 'ere', 'mat', 'nat', 'tecn', 'compo' ,'fundamental','band'
     )
+        
+    # Codigo column to int
+    wrapped_df['codigo'] = wrapped_df['codigo'].astype('int')
     
     return wrapped_df
 
@@ -503,14 +505,12 @@ if __name__ == "__main__":
         processed_data_1 = process_grades_columns(
                                                 retrieve_grade_reports(
                                                     inpath=path, 
-                                                    final_student=config['students_p1'], 
                                                     period='P1'
                                                     )['p1']
                                                 ).rename(columns={"nat":"qui"})
         processed_data_2 = process_grades_columns(
                                                     retrieve_grade_reports(
                                                         inpath=path, 
-                                                        final_student=config['students_p2'], 
                                                         period='P2'
                                                     )['p2']
                                                 ).rename(columns={"nat":"qui"})
@@ -520,8 +520,6 @@ if __name__ == "__main__":
     df = pd.concat(
         objs = processed_data.values(),
         axis = 0
-    ).select(
-    'lect', 'esp', 'ingl', 'mat', 'qui', 'fis', 'filo', 'econ', 'poli', 'tecn', 'edufi', 'ere', 'compo', 'fundamental', 'band'
     )
        
     logger.info(f"Dataframes: {df.isna().sum()}")
