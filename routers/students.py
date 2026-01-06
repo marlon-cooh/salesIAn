@@ -47,6 +47,19 @@ def delete_student(student_id: int, session: SessionDep):
     session.commit()
     return {"ok": True}
 
+# Post student lists (Testing endpoint)
+@router.post("/students/cohort", response_model=list[Student], tags=["student"], status_code=status.HTTP_201_CREATED)
+async def create_student_cohort(students : list[StudentCreate], session : SessionDep):
+    db_students = [Student.model_validate(student.model_dump()) for student in students]
+    session.add_all(db_students)
+    session.commit()
+    
+    # IDs are created
+    for s in db_students:
+        session.refresh(s)
+    return db_students
+
+# Get all students info
 @router.get("/students/", response_model=list[Student], tags=['student'])
 def read_students(session: SessionDep):
     students = session.exec(select(Student)).all()

@@ -1,12 +1,13 @@
 from sqlmodel import SQLModel, Field, Relationship
 
 class StudentBase(SQLModel):
+    code : int | None = None
     name : str | None = None
     age : int
     social_data : int | None = None
     overall_grade : str
-    fundamental_comp : str
-    behavioral_comp : str
+    fundamental_comp : int
+    behavioral_comp : int
     disabilities : str | None
     
 class StudentSubjectLink(SQLModel, table=True):
@@ -20,9 +21,9 @@ class StudentSubjectLink(SQLModel, table=True):
 class Term(SQLModel, table=True):
     __tablename__ = "term"
     id : int | None = Field(default=None, primary_key=True)
-    code : str
-    label : str
-    order : int
+    code : str # e.g., P1, P2, P3, PF.
+    label : str # e.g., "Primer periodo", "Segundo periodo", ...
+    order : int  # e.g., 1, 2, 3, 4 (used for sorting)
     student_links : list[StudentSubjectLink] = Relationship(back_populates='term')
     
 class StudentCreate(StudentBase):

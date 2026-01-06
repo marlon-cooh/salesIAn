@@ -1,6 +1,7 @@
 from fastapi import APIRouter, status, HTTPException
 from models import Subject, StudentSubjectLink, SubjectUpdate
 from app.dependencies import SessionDep
+from sqlmodel import select
 
 router = APIRouter()
 
@@ -19,7 +20,12 @@ async def get_subject(subject_id : int, session : SessionDep):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
     return subj_db
 
-@router.put("/subject/{subject_id}", tags=["subjects"], response_model=Subject)
+@router.get("/subjects", tags=["subjects"], response_model=list[Subject])
+async def get_all_subjects(session : SessionDep):
+    subjects = session.exec(select(Subject)).all()
+    return subjects
+
+@router.put("/subjects/{subject_id}", tags=["subjects"], response_model=Subject)
 def update_subject(subject_id : int, subject_update : SubjectUpdate, session : SessionDep):
     subject = session.get(Subject, subject_id)
     if not subject:

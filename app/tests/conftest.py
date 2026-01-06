@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel
 
-from app.main import test_app
+from app.assert_app import test_app
 from app.db_create import get_session
 
 # Database for testing
