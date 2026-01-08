@@ -18,106 +18,6 @@ subjects_9 = ['codigo', 'no_lista', 'nombre', 'periodo', 'esp', 'ingl', 'edufi',
 subjects_10 = ['codigo', 'no_lista', 'nombre', 'periodo', 'lect', 'esp', 'mat', 'econ', 'ingl', 'nat', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo']
 subjects_11 = ['codigo', 'no_lista', 'nombre', 'periodo', 'lect', 'esp', 'mat', 'econ', 'ingl', 'qui', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo']
 
-def retrieve_processed_dataframes(inpath:str, outpath:str) -> pd.DataFrame:
-    """
-        (*To be deprecated)
-        This function returns a dataframe suitable for training ML models in the context of this project (Grades analysis).
-        (Args):
-            * inpath : Path associated to .parquet files after reading and cleaning HTMLs.
-            * outpath : Path where .csv files will be saved to train upcoming models.
-        Returns:
-            CSV files including data for ML stage.
-    """
-    # Defining path
-    if inpath is None or outpath is None:
-        raise ValueError("Input and output paths must be provided.")
-    
-    base = Path(inpath)
-    outpath = Path(outpath)
-    paths = sorted(base.glob("*.parquet"))
-    
-    # Dictionary of dataframes
-    dfs = {p.stem : pd.read_parquet(p) for p in paths}
-    
-    # Columns to drop
-    cols_to_drop = ['Competencia', 'OBS  4', 'OBS  5', 'OBS  2', 'Rec PF', 'OBS  1',
-       'Nota P3', 'Rec P3', 'OBS  3', 'Nota P2']
-    
-    # Columns to preprocess
-    cat_cols = ['CONOCER', 'HACER', 'SER', 'CONVIVIR', 'Subtotal NIVEL']
-    rec_cols = ['Rec P1', 'Rec P2']
-    
-    # Transforming missing values from rec_cols
-    rec_make_flags = FunctionTransformer(
-            func=lambda X: X.notna().astype(int),
-            feature_names_out="one-to-one"
-        )
-    
-    # Creating pipelines
-        # Categorical data pipeline
-    cat_pipe = Pipeline(
-        [
-            ("impute", SimpleImputer(strategy='constant', fill_value=1)), 
-            ("ohe", OneHotEncoder(handle_unknown='ignore', sparse_output=False))
-        ] 
-    )
-
-    # `Recuperacion` data pipeline
-    rec_pipe = Pipeline(
-        [
-            ("impute", rec_make_flags)
-        ]
-    )
-    
-    # ColumnTransformer including all pipelines.
-    pre = ColumnTransformer(
-        transformers=[
-            ('cat', cat_pipe, cat_cols),
-            ('rec', rec_pipe, rec_cols)
-        ],
-        remainder='passthrough',
-        verbose_feature_names_out=True
-    )
-    
-    logger.info(f"Preprocessing methods are successfully defined. {pre}")
-    
-    # Adjusting data by using ColumnTransformer
-    for names, df in dfs.items():
-
-        try:
-           # Logging dataframes names
-           logger.info(f"Processing dataframe: {names}")
-           
-           X = df.drop(columns=cols_to_drop)
-           y = df[["Nota P2"]] # Target variable. (So far.)
-           
-           transformed = pre.fit_transform(X)
-           pre.set_params(verbose_feature_names_out=False)
-           pre.get_feature_names_out()
-           
-           transformed_df = pd.DataFrame(
-               data=transformed,
-               index=df.index,
-               columns=pre.get_feature_names_out()
-           )
-           
-           transformed_df["Nota P2"] = y
-           
-           # Logging transformed columns
-           logger.info(f"Transformed dataframe columns: {transformed_df.columns.tolist()}")
-           
-           output_file = outpath.joinpath(f"{names}.csv")
-           
-           # Existing directory?
-           if not outpath.exists():
-               outpath.mkdir(parents=True, exist_ok=True)
-               
-           transformed_df.to_csv(output_file, index=False)
-           logger.info(f"Saved processed dataframe to: {output_file}")
-        
-        except Exception as e:
-           logger.error(f"Error processing dataframe {names}: {e}")
-
 def remove_unregistered_students(raw_df:pd.DataFrame) -> pd.DataFrame:
     """
         Cleans the raw dataframe by removing unnecessary columns and rows that do not contain grading information along with students that are not listed in the courses.
@@ -259,9 +159,9 @@ def retrieve_grade_reports(inpath:str, cols_to_present=None, **kwargs) -> dict:
                 "Additional parameters MUST be period indicators: 'P1', 'P2', 'P3', or 'PF'."
             )
                 
-    # Creating dataframes for periods P1 and P2.
+    # Creating dataframes for terms. (This has to be updated!)
     
-    level_grades_p1 = level_grades[level_grades['idx'] %2 == 0].drop(columns={'periodo', 'no_lista'}, axis=1)
+    level_grades_p1 = level_grades[level_grades['idx'] %2 == 0].drop(columns={'no_lista'}, axis=1)
     level_grades_p2 = level_grades[level_grades['idx'] %2 != 0]
     
     # Assigning columns depending on selected level.
@@ -290,11 +190,26 @@ def retrieve_grade_reports(inpath:str, cols_to_present=None, **kwargs) -> dict:
         )[new_labels].rename(
         columns=columns_to_replace
     )
+        
+    # Assign value 'P2' to period column in level_grades_p2
+    level_grades_p2['periodo'] = 'P2'
             
     # Removing unnecessary columns
     if 'esc_pad' in level_grades_p1.columns or 'esc_pad' in level_grades_p2.columns:
         level_grades_p1 = safe_drop(level_grades_p1, 'esc_pad')
         level_grades_p2 = safe_drop(level_grades_p2, 'esc_pad')
+        
+    # Renaming columns to standard format.
+    level_grades_p1 = level_grades_p1.rename(
+        columns={
+            "nat" : "qui"
+        }
+    )
+    level_grades_p2 = level_grades_p2.rename(
+        columns={
+            "nat" : "qui"
+        }
+    )
         
     dfs = {
             "p1" : level_grades_p1, 
@@ -303,7 +218,7 @@ def retrieve_grade_reports(inpath:str, cols_to_present=None, **kwargs) -> dict:
         
     return dfs
 
-def process_grades_columns(df:pd.DataFrame, cols_to_drop:list = []) -> pd.DataFrame:
+def process_grades_columns(df:pd.DataFrame) -> pd.DataFrame:
     """
     This function returns an ordinal encoded version of grades in student report, this version is useful to create visualization or train simple ML models.
         Args:
@@ -315,13 +230,13 @@ def process_grades_columns(df:pd.DataFrame, cols_to_drop:list = []) -> pd.DataFr
     # Rearranging columns
     # Filtering columns
     if 'qui' not in set(df.columns.tolist()) and 'lect' in set(df.columns.tolist()):
-        df = df[['idx', 'codigo', 'nombre', 'period', 'lect', 'esp', 'mat', 'econ', 'ingl', 'nat', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo']]
+        df = df[['idx', 'codigo', 'nombre', 'periodo', 'lect', 'esp', 'mat', 'econ', 'ingl', 'nat', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo']]
     
     elif 'nat' not in (df.columns.tolist()):
-        df = df[['idx', 'codigo', 'nombre', 'period', 'lect', 'esp', 'mat', 'econ', 'ingl', 'qui', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo']]
+        df = df[['idx', 'codigo', 'nombre', 'periodo', 'lect', 'esp', 'mat', 'econ', 'ingl', 'qui', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo']]
     
     elif 'qui' not in set(df.columns.tolist()) and 'lect' not in set(df.columns.tolist()):
-        df = df[['idx', 'codigo', 'nombre', 'period', 'esp', 'ingl', 'edufi', 'art', 'soc', 'ere', 'mat', 'nat', 'tecn', 'compo']]
+        df = df[['idx', 'codigo', 'nombre', 'periodo', 'esp', 'ingl', 'edufi', 'art', 'soc', 'ere', 'mat', 'nat', 'tecn', 'compo']]
     
     # If there are columns to drop
     df.drop(columns=[], inplace=True)
@@ -459,15 +374,15 @@ def df_to_model(input_dfs:list) -> pd.DataFrame:
     # Filtering columns
     if 'qui' not in set(wrapped_df.columns.tolist()) and 'lect' in set(wrapped_df.columns.tolist()):
         wrapped_df.select(
-                  'idx', 'codigo', 'nombre', 'period', 'lect', 'esp', 'mat', 'econ', 'ingl', 'nat', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo', 'fundamental','band'
+                  'idx', 'codigo', 'nombre', 'periodo', 'lect', 'esp', 'mat', 'econ', 'ingl', 'nat', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo', 'fundamental','band'
         )
     elif 'nat' not in (wrapped_df.columns.tolist()) and 'lect' in set(wrapped_df.columns.tolist()):
         wrapped_df.select(
-        'idx', 'codigo', 'nombre', 'period', 'lect', 'esp', 'mat', 'econ', 'ingl', 'qui', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo', 'fundamental','band'
+        'idx', 'codigo', 'nombre', 'periodo', 'lect', 'esp', 'mat', 'econ', 'ingl', 'qui', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo', 'fundamental','band'
     )
     elif 'qui' not in set(wrapped_df.columns.tolist()) and 'lect' not in set(wrapped_df.columns.tolist()):
         wrapped_df.select(
-        'idx', 'codigo', 'nombre', 'period', 'esp', 'ingl', 'edufi', 'art', 'soc', 'ere', 'mat', 'nat', 'tecn', 'compo' ,'fundamental','band'
+        'idx', 'codigo', 'nombre', 'periodo', 'esp', 'ingl', 'edufi', 'art', 'soc', 'ere', 'mat', 'nat', 'tecn', 'compo' ,'fundamental','band'
     )
         
     # Codigo column to int

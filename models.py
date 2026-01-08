@@ -15,7 +15,7 @@ class StudentSubjectLink(SQLModel, table=True):
     student_id : int = Field(foreign_key="student.id", primary_key=True)
     subject_id : int = Field(foreign_key="subject.id", primary_key=True)
     term_id : int = Field(foreign_key="term.id", primary_key=True)
-    grade : str
+    grade : int # (1-7-2026, just for means of testing, this will be int type)
     term : 'Term' = Relationship(back_populates='student_links') 
     
 class Term(SQLModel, table=True):

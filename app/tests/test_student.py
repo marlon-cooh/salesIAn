@@ -5,15 +5,40 @@ from sqlmodel import select
 from models import Student, Subject, Term, StudentSubjectLink
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-json_path = os.path.join(
+student_path = os.path.join(
     os.path.dirname(os.path.dirname(BASE_DIR)),
     "student_info.json"
 )
+subject_path = os.path.join(
+    os.path.dirname(os.path.dirname(BASE_DIR)),
+    "subjects.json"
+)
+student_to_subject_path = os.path.join(
+    os.path.dirname(os.path.dirname(BASE_DIR)),
+    "student_to_subject.json"
+)
+term_path = os.path.join(
+    os.path.dirname(os.path.dirname(BASE_DIR)),
+    "terms.json"
+)
 
-with open(json_path, "r", encoding="utf-8") as f:
+# Students info.
+with open(student_path, "r", encoding="utf-8") as f:
     student_info = json.load(f)
     
-# Students.  
+# Subjects info.
+with open(subject_path, "r", encoding="utf-8") as f:
+    subject_info = json.load(f)
+    
+# Student to subject info.
+with open(student_to_subject_path, "r", encoding="utf-8") as f:
+    student_to_subject_info = json.load(f)
+
+# Terms
+with open(term_path, "r", encoding="utf-8") as f:
+    term_info = json.load(f)
+    
+# Students tests.  
 def test_create_student(client):
     response = client.post(
         "/students/",
@@ -66,11 +91,7 @@ def test_create_subject(client):
     assert response.status_code == status.HTTP_200_OK
     
 def test_create_list_subjects(client):
-    subjects = [
-        {"component" : "Mathematics"},
-        {"component" : "Science"},
-        {"component" : "History"}
-    ]
+    subjects = subject_info
     for subj in subjects:
         response = client.post("/subjects/", json=subj)
         assert response.status_code == status.HTTP_200_OK
@@ -121,4 +142,43 @@ def test_create_subject_link(session):
 
 # def test_delete_student(client):
 #     pass
+
+# Student to subject
+def test_create_student_to_subject(client):
+    response = client.post(
+        "/subjects/relationship",
+        json={
+        "student_id": 28,
+        "subject_id": 10,
+        "term_id": 1,
+        "grade": 3.0
+        },
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.json()["student_id"] == 28
+
+# def test_create_list_students_to_subject(client):
+#     response = client.post(
+#         "/subjects/all",
+#         json=student_to_subject_info
+#     )
+#     assert response.status_code == status.HTTP_201_CREATED
     
+# Term
+def test_create_term(client):
+    response = client.post(
+        "/term",
+        json={
+        "code": "P1",
+        "label": "1\u00b0 Periodo",
+        "order": 1
+        }
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    
+def test_create_list_terms(client):
+    response = client.post(
+        "/term/all",
+        json=term_info
+    )
+    assert response.status_code == status.HTTP_201_CREATED
