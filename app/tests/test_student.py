@@ -148,21 +148,21 @@ def test_create_student_to_subject(client):
     response = client.post(
         "/subjects/relationship",
         json={
-        "student_id": 28,
-        "subject_id": 10,
-        "term_id": 1,
-        "grade": 3.0
-        },
+            "student_id": 564,
+            "subject_id": 13,
+            "term_id": 2,
+            "grade": 3.0
+        }
     )
     assert response.status_code == status.HTTP_201_CREATED
-    assert response.json()["student_id"] == 28
+    assert response.json()["student_id"] == 564
 
-# def test_create_list_students_to_subject(client):
-#     response = client.post(
-#         "/subjects/all",
-#         json=student_to_subject_info
-#     )
-#     assert response.status_code == status.HTTP_201_CREATED
+def test_create_list_students_to_subject(client):
+    response = client.post(
+        "/subjects/all",
+        json=student_to_subject_info
+    )
+    assert response.status_code == status.HTTP_201_CREATED
     
 # Term
 def test_create_term(client):

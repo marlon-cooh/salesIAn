@@ -48,6 +48,12 @@ def delete_subject(subject_id : int, session : SessionDep):
     session.commit()
     return {"ok" : True}
 
+@router.post("/subjects/all", tags=["subjects"], status_code=status.HTTP_201_CREATED)
+async def create_multiple_subjects(subject_info: list[Subject], session : SessionDep):
+    session.add_all(subject_info)
+    session.commit()
+    return subject_info
+
 # StudentSubjectLink table    
 @router.post("/subjects/relationship", tags=["grades"], response_model=StudentSubjectLink, status_code=status.HTTP_201_CREATED)
 async def create_grade_register(subject_info : StudentSubjectLink, session : SessionDep):
@@ -57,7 +63,7 @@ async def create_grade_register(subject_info : StudentSubjectLink, session : Ses
     session.refresh(grade_db)
     return grade_db
 
-@router.post("/subjects/all", tags=["grades"], status_code=status.HTTP_201_CREATED)
+@router.post("/subjects/links", tags=["grades"], status_code=status.HTTP_201_CREATED)
 async def create_grade_register(subject_info: list[StudentSubjectLink], session: SessionDep):
     session.add_all(subject_info)
     session.commit()
