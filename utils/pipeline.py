@@ -18,6 +18,9 @@ subjects_9 = ['codigo', 'no_lista', 'nombre', 'periodo', 'esp', 'ingl', 'edufi',
 subjects_10 = ['codigo', 'no_lista', 'nombre', 'periodo', 'lect', 'esp', 'mat', 'econ', 'ingl', 'nat', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo']
 subjects_11 = ['codigo', 'no_lista', 'nombre', 'periodo', 'lect', 'esp', 'mat', 'econ', 'ingl', 'qui', 'fis', 'filo', 'poli', 'ere', 'edufi', 'tecn', 'compo']
 
+# Levels in the institution.
+levels = ["5-1", "6-1", "6-2", "6-3", "6-4", "7-1", "7-2", "7-3", "7-4", "8-1", "8-2", "8-3", "9-1", "9-2", "9-3", "10-1", "10-2", "10-3", "10-4", "11-1", "11-2", "11-3"]
+
 def remove_unregistered_students(raw_df:pd.DataFrame) -> pd.DataFrame:
     """
         Cleans the raw dataframe by removing unnecessary columns and rows that do not contain grading information along with students that are not listed in the courses.
@@ -89,6 +92,90 @@ def clean_level_grades(df: pd.DataFrame, cols_to_present: list) -> pd.DataFrame:
 
 def safe_drop(df:pd.DataFrame, colname:str) -> pd.DataFrame:
     return df.drop(columns=[colname], errors='ignore')
+
+def remove_undesired_columns(path:str, terms_to_remove:list) -> pd.DataFrame:
+    """
+        Function that reads a CSV file, cleans specific rows based on given terms,
+        and returns a cleaned DataFrame.
+        Parameters:
+        - path (str): Path to the CSV file.
+        - terms_to_remove (list): List of terms to identify rows for removal.
+        Returns:
+        - pd.DataFrame: Cleaned DataFrame.
+    """
+    # Reading dataframe.
+    data = pd.read_csv(path, encoding="cp1252", header=2)
+    
+    # Renaming columns for posterior analysis.
+    data.rename(
+        columns={f"Unnamed: {x}": f"{x}" for x in range(0, 24)},
+        inplace=True
+    )
+    data.rename(
+        columns={data.columns[2]:"process"},
+        inplace=True
+    )
+    
+    # Cleaning characters
+    s_clean = (
+        data.process.fillna('')
+        .str.normalize('NFD')
+        .str.replace(r'[\u0300-\u036f]', '', regex=True)
+        .str.upper()
+    )
+    data["process"] = s_clean
+    
+    # Masks to remove undesired rows.
+    patterns = "|".join(terms_to_remove)
+    mask = data["process"].str.contains(patterns, regex=True, na=False)
+
+    rows_to_remove = data[mask].index.tolist()
+    data = data.drop(index=rows_to_remove)
+    
+    # Renaming columns based on first row values.
+    data.columns = data.iloc[0].values.tolist()
+    data = data.clean_names()
+
+    return data
+
+def split_by_level(df:pd.DataFrame) -> dict:
+    """
+        Splits a DataFrame into multiple DataFrames based on predefined levels.
+        Args:
+            df (pd.DataFrame): The input DataFrame to be split.
+        Returns:
+            dict: A dictionary where keys are levels and values are the corresponding DataFrames.
+    """
+    
+    cleaned_data = df.copy() # To be reviewed.
+    cleaned_data.reset_index(drop=True, inplace=True)
+    
+    # Rows to split each level.
+    rows_for_each_level = cleaned_data[cleaned_data.codigo.str.contains("codigo", na=False)].index.tolist()
+    rows_for_each_level.pop(-1) # This is removed because it does not make part of this dataset.
+    
+    # Matching levels with rows to split dataframe
+    levels_dict = {x:y for x,y in zip(levels, rows_for_each_level)}
+    
+    # Assigning dictionary.
+    list_cleaned_dfs = {}
+    for number, key in enumerate(levels_dict):
+        start = levels_dict[levels[number]]
+        end = levels_dict[levels[number+1]] if number+1 < len(levels) else None
+        list_dfs[key] = cleaned_data.iloc[start:end, :]
+    
+    for key, dataset in list_cleaned_dfs.items():
+        dataset = dataset.copy()
+        
+        dataset.columns = dataset.iloc[0].tolist()    
+        dataset = dataset.clean_names()
+
+        mask = dataset["no_lista"].astype(str).str.contains(r"\bNo\b", na=False)
+        dataset = dataset.loc[~mask].copy()
+        
+        list_cleaned_dfs[key] = dataset
+        
+    return list_cleaned_dfs
 
 def retrieve_grade_reports(inpath:str, cols_to_present=None, **kwargs) -> dict:
     """
