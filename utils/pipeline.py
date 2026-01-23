@@ -20,6 +20,20 @@ subjects_11 = ['codigo', 'no_lista', 'nombre', 'periodo', 'lect', 'esp', 'mat', 
 
 # Levels in the institution.
 levels = ["5-1", "6-1", "6-2", "6-3", "6-4", "7-1", "7-2", "7-3", "7-4", "8-1", "8-2", "8-3", "9-1", "9-2", "9-3", "10-1", "10-2", "10-3", "10-4", "11-1", "11-2", "11-3"]
+columns_to_drop_in_datasets = ['esc_pad', 'electiva', 's', 'a', 'b', 'nan', 'b.1', 'nan', 'nan.1', 'nan.2', 'nan.3']
+terms_to_clean = [
+    "GRUPO", 
+    "SUPERIOR", 
+    "ALTO", 
+    "BAJO", 
+    "INSTITUCIIN",
+    "AGRICOLA",
+    "HOLANDA", 
+    "CONSOLIDADO",
+    "PROCESO",
+    r"\(\s*[A-Za-z]\s*\)"
+]
+
 
 def remove_unregistered_students(raw_df:pd.DataFrame) -> pd.DataFrame:
     """
@@ -93,7 +107,7 @@ def clean_level_grades(df: pd.DataFrame, cols_to_present: list) -> pd.DataFrame:
 def safe_drop(df:pd.DataFrame, colname:str) -> pd.DataFrame:
     return df.drop(columns=[colname], errors='ignore')
 
-def remove_undesired_columns(path:str, terms_to_remove:list) -> pd.DataFrame:
+def remove_undesired_columns(path:str, terms_to_remove:list=terms_to_clean) -> pd.DataFrame:
     """
         Function that reads a CSV file, cleans specific rows based on given terms,
         and returns a cleaned DataFrame.
@@ -151,7 +165,7 @@ def split_by_level(df:pd.DataFrame) -> dict:
     cleaned_data.reset_index(drop=True, inplace=True)
     
     # Rows to split each level.
-    rows_for_each_level = cleaned_data[cleaned_data.codigo.str.contains("codigo", na=False)].index.tolist()
+    rows_for_each_level = cleaned_data[cleaned_data.codigo.str.contains("codigo", na=False, case=False)].index.tolist()
     rows_for_each_level.pop(-1) # This is removed because it does not make part of this dataset.
     
     # Matching levels with rows to split dataframe
@@ -162,7 +176,7 @@ def split_by_level(df:pd.DataFrame) -> dict:
     for number, key in enumerate(levels_dict):
         start = levels_dict[levels[number]]
         end = levels_dict[levels[number+1]] if number+1 < len(levels) else None
-        list_dfs[key] = cleaned_data.iloc[start:end, :]
+        list_cleaned_dfs[key] = cleaned_data.iloc[start:end, :]
     
     for key, dataset in list_cleaned_dfs.items():
         dataset = dataset.copy()
@@ -176,6 +190,49 @@ def split_by_level(df:pd.DataFrame) -> dict:
         list_cleaned_dfs[key] = dataset
         
     return list_cleaned_dfs
+
+def generate_reports(dataset:pd.DataFrame) -> pd.DataFrame:
+    """
+        Generates a cleaned and formatted report from the input dataset.
+        Args:
+            dataset (pd.DataFrame): The input dataset to be processed.
+        Returns:
+            pd.DataFrame: The cleaned and formatted report.
+    """
+
+    # Remove unregistered students or dropouts!
+    rm_stud_idx = dataset[dataset.nombre.str.contains(
+        r"\(\w+\)",
+        regex=True,
+        case=False,
+        na=False        
+    )].index.tolist()
+    
+    dropout_students_info = []
+    for idx in rm_stud_idx: # indexers
+        for subidx in range(idx, idx+4):
+            dropout_students_info.append(subidx)
+            
+    dataset.loc[dropout_students_info, :]
+    dataset.drop(index=dropout_students_info, inplace=True)
+    
+    # Replacing "pendie" for "PF"
+    pendie_cond = dataset["periodo"] == "Pendie"
+    dataset.loc[pendie_cond, "periodo"] = "PF"
+    
+    # Replacing empty spaces in nombre
+    empty_cond = dataset["nombre"] == ""
+    dataset.loc[empty_cond, "nombre"] = np.nan
+    
+    # Removing unnecessary columns.
+    dataset.drop(columns=columns_to_drop_in_datasets, errors="ignore", inplace=True)
+    
+    # Treating missing values.
+    dataset.dropna(axis=0, how="all", inplace=True)
+    dataset[["codigo", "no_lista", "nombre"]] = dataset[["codigo", "no_lista", "nombre"]].ffill()
+    dataset.iloc[:, 4:] = dataset.iloc[:, 4:].bfill()
+    
+    return dataset
 
 def retrieve_grade_reports(inpath:str, cols_to_present=None, **kwargs) -> dict:
     """
